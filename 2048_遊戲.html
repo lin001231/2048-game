@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>2048</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #eaf4ff;
+    font-family: Arial, "Noto Sans TC", sans-serif;
+    color: #164a7a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px 12px;
+  }
+  .game { width: min(94vw, 500px); }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  h1 { font-size:64px; margin:0; color:#164a7a; line-height:1; }
+  .scores { display:flex; gap:8px; }
+  .score-box {
+    background:#2f6fae; color:white; min-width:90px; padding:8px 12px;
+    border-radius:6px; text-align:center; font-weight:bold;
+  }
+  .score-box small { display:block; font-size:12px; opacity:.9; }
+  .score-box span { font-size:24px; }
+  .bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  .hint { font-size:14px; line-height:1.4; }
+  button {
+    border:0; border-radius:6px; background:#1f5b91; color:white;
+    padding:11px 16px; font-weight:bold; cursor:pointer; font-size:15px;
+  }
+  button:active { transform:scale(.97); }
+  #board {
+    background:#2f6fae; padding:10px; border-radius:8px;
+    display:grid; grid-template-columns:repeat(4,1fr); gap:10px;
+    touch-action:none; user-select:none;
+  }
+  .cell {
+    aspect-ratio:1; background:#b9d9f5; border-radius:6px;
+    display:flex; justify-content:center; align-items:center;
+    font-size:clamp(24px, 8vw, 44px); font-weight:bold;
+    color:#164a7a; transition:transform .08s ease;
+  }
+  .cell.new { animation: pop .15s ease; }
+  @keyframes pop { 0%{transform:scale(.7)} 100%{transform:scale(1)} }
+  .n2{background:#dceeff}.n4{background:#c9e5ff}
+  .n8,.n16,.n32,.n64{background:#7db8e8;color:#ffffff}
+  .n128,.n256,.n512{background:#4f98d1;color:#ffffff}
+  .n1024,.n2048{background:#2878b8;color:#ffffff}
+  .n4096,.n8192{background:#14527f;color:#ffffff}
+  #message {
+    display:none; position:fixed; inset:0; background:rgba(218,237,255,.82);
+    justify-content:center; align-items:center; text-align:center;
+  }
+  .modal { background:#eaf4ff; padding:28px; border-radius:10px; box-shadow:0 8px 30px #0002; }
+  .modal h2 { font-size:34px; margin:0 0 8px; }
+  .modal p { margin:0 0 18px; }
+  @media(max-width:380px){ h1{font-size:52px}.score-box{min-width:76px}.score-box span{font-size:20px} }
+</style>
+</head>
+<body>
+<div class="game">
+  <div class="top">
+    <h1>2048</h1>
+    <div class="scores">
+      <div class="score-box"><small>分數</small><span id="score">0</span></div>
+      <div class="score-box"><small>最高分</small><span id="best">0</span></div>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="hint">使用 ← ↑ → ↓ 移動<br>手機可直接滑動方塊</div>
+    <button id="restart">重新開始</button>
+  </div>
+  <div id="board"></div>
+</div>
+
+<div id="message">
+  <div class="modal">
+    <h2>遊戲結束！</h2>
+    <p>你的分數：<b id="finalScore">0</b></p>
+    <button id="again">再玩一次</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const message = document.getElementById('message');
+const finalScore = document.getElementById('finalScore');
+
+let board, score = 0;
+let best = Number(localStorage.getItem('2048-best') || 0);
+bestEl.textContent = best;
+
+function emptyBoard(){ return Array.from({length:16},()=>0); }
+
+function start(){
+  board = emptyBoard();
+  score = 0;
+  message.style.display='none';
+  addTile(); addTile();
+  update();
+}
+function addTile(){
+  const empty = board.map((v,i)=>v===0?i:-1).filter(i=>i>=0);
+  if(!empty.length) return;
+  const i = empty[Math.floor(Math.random()*empty.length)];
+  board[i] = Math.random()<0.9 ? 2 : 4;
+}
+function update(){
+  boardEl.innerHTML='';
+  board.forEach(v=>{
+    const cell=document.createElement('div');
+    cell.className='cell'+(v?' n'+v:'');
+    cell.textContent=v||'';
+    boardEl.appendChild(cell);
+  });
+  scoreEl.textContent=score;
+  if(score>best){
+    best=score;
+    localStorage.setItem('2048-best',best);
+  }
+  bestEl.textContent=best;
+}
+function move(dir){
+  const old=board.join(',');
+  let lines=[];
+  if(dir==='left'||dir==='right'){
+    for(let r=0;r<4;r++) lines.push(board.slice(r*4,r*4+4));
+  } else {
+    for(let c=0;c<4;c++) lines.push([board[c],board[c+4],board[c+8],board[c+12]]);
+  }
+
+  lines=lines.map(line=>{
+    if(dir==='right'||dir==='down') line.reverse();
+    line=line.filter(x=>x);
+    for(let i=0;i<line.length-1;i++){
+      if(line[i]===line[i+1]){
+        line[i]*=2;
+        score+=line[i];
+        line.splice(i+1,1);
+      }
+    }
+    while(line.length<4) line.push(0);
+    if(dir==='right'||dir==='down') line.reverse();
+    return line;
+  });
+
+  if(dir==='left'||dir==='right'){
+    for(let r=0;r<4;r++) for(let c=0;c<4;c++) board[r*4+c]=lines[r][c];
+  } else {
+    for(let c=0;c<4;c++) for(let r=0;r<4;r++) board[r*4+c]=lines[c][r];
+  }
+
+  if(board.join(',')!==old){
+    addTile();
+    update();
+    if(!canMove()) setTimeout(endGame,180);
+  }
+}
+function canMove(){
+  if(board.some(v=>v===0)) return true;
+  for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+    const i=r*4+c;
+    if(c<3 && board[i]===board[i+1]) return true;
+    if(r<3 && board[i]===board[i+4]) return true;
+  }
+  return false;
+}
+function endGame(){
+  finalScore.textContent=score;
+  message.style.display='flex';
+}
+
+document.addEventListener('keydown',e=>{
+  const keys={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+  if(keys[e.key]){e.preventDefault();move(keys[e.key]);}
+});
+document.getElementById('restart').onclick=start;
+document.getElementById('again').onclick=start;
+
+let sx=0,sy=0;
+boardEl.addEventListener('touchstart',e=>{
+  const t=e.changedTouches[0]; sx=t.clientX; sy=t.clientY;
+},{passive:true});
+boardEl.addEventListener('touchend',e=>{
+  const t=e.changedTouches[0], dx=t.clientX-sx, dy=t.clientY-sy;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<30) return;
+  move(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'));
+},{passive:true});
+
+start();
+</script>
+</body>
+</html>
