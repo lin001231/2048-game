@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>藍色 2048</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:Arial,"Noto Sans TC",sans-serif}
+body{
+  min-height:100vh;
+  background:#eaf4ff;
+  color:#17324d;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:16px 8px;
+  overflow-x:hidden;
+}
+.game{
+  width:min(94vw,500px);
+  max-width:100%;
+  min-width:0;
+}
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:14px;
+}
+h1{
+  font-size:clamp(48px,15vw,64px);
+  margin:0;
+  color:#1769aa;
+  line-height:1;
+}
+.scores{display:flex;gap:6px}
+.score-box{
+  background:#2d8dcc;
+  color:white;
+  min-width:76px;
+  padding:7px 8px;
+  border-radius:7px;
+  text-align:center;
+  font-weight:bold;
+}
+.score-box small{display:block;font-size:11px}
+.score-box span{font-size:21px}
+.bar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:12px;
+  gap:8px;
+}
+.hint{font-size:13px;line-height:1.4}
+button{
+  border:0;
+  border-radius:7px;
+  background:#1769aa;
+  color:white;
+  padding:10px 13px;
+  font-weight:bold;
+  cursor:pointer;
+  font-size:14px;
+}
+button:active{transform:scale(.97)}
+#board{
+  width:100%;
+  max-width:500px;
+  background:#5aa9df;
+  padding:clamp(6px,2.5vw,10px);
+  border-radius:9px;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:clamp(6px,2.5vw,10px);
+  touch-action:none;
+  user-select:none;
+  overflow:hidden;
+}
+.cell{
+  min-width:0;
+  aspect-ratio:1;
+  background:#a9d8f5;
+  border-radius:6px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  overflow:hidden;
+  white-space:nowrap;
+  text-align:center;
+  font-size:clamp(20px,8vw,44px);
+  font-weight:bold;
+  line-height:1;
+  color:#17324d;
+}
+.cell.n2{background:#dff2ff}
+.cell.n4{background:#c8e8fb}
+.cell.n8{background:#9ed4f2;color:#fff}
+.cell.n16{background:#72b9e6;color:#fff}
+.cell.n32{background:#4a9bd2;color:#fff}
+.cell.n64{background:#2d83c2;color:#fff}
+.cell.n128{background:#2373b0;color:#fff}
+.cell.n256{background:#1c639b;color:#fff}
+.cell.n512{background:#175589;color:#fff}
+.cell.n1024{background:#124a78;color:#fff}
+.cell.n2048{background:#0b3558;color:#fff}
+
+/* 四位數開始自動縮小，避免手機版數字跑出方格 */
+.cell.n1024,.cell.n2048{
+  font-size:clamp(17px,6vw,34px);
+}
+.cell.n4096,.cell.n8192,.cell.n16384,.cell.n32768,.cell.n65536{
+  background:#092b46;
+  color:#fff;
+  font-size:clamp(14px,5vw,28px);
+}
+
+#message{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(210,235,252,.86);
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  padding:20px;
+}
+.modal{
+  background:#f5fbff;
+  padding:26px;
+  border-radius:12px;
+  box-shadow:0 8px 30px #1769aa33;
+  width:min(90vw,360px);
+}
+.modal h2{font-size:clamp(22px,7vw,32px);margin:0 0 8px;color:#1769aa;white-space:normal;word-break:keep-all;line-height:1.35}
+.modal p{margin:0 0 18px;font-size:clamp(14px,4.5vw,18px);line-height:1.6;white-space:normal;word-break:keep-all}
+
+@media(max-width:380px){
+  body{padding:10px 6px}
+  .top{margin-bottom:10px}
+  h1{font-size:48px}
+  .score-box{min-width:68px;padding:6px}
+  .score-box small{font-size:10px}
+  .score-box span{font-size:18px}
+  .hint{font-size:11px}
+  button{padding:9px 10px;font-size:13px}
+  .cell{font-size:clamp(18px,7vw,28px)}
+  .cell.n1024,.cell.n2048{font-size:clamp(15px,5.5vw,24px)}
+  .cell.n4096,.cell.n8192,.cell.n16384,.cell.n32768,.cell.n65536{
+    font-size:clamp(12px,4.5vw,21px)
+  }
+}
+</style>
+</head>
+<body>
+<div class="game">
+  <div class="top">
+    <h1>2048</h1>
+    <div class="scores">
+      <div class="score-box"><small>分數</small><span id="score">0</span></div>
+      <div class="score-box"><small>最高分</small><span id="best">0</span></div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="hint">使用方向鍵移動<br>手機直接滑動方塊</div>
+    <button id="restart">重新開始</button>
+  </div>
+
+  <div id="board"></div>
+</div>
+
+<div id="message">
+  <div class="modal">
+    <h2>遊戲結束！</h2>
+    <p>你的分數：<b id="finalScore">0</b></p>
+    <button id="again">再玩一次</button>
+  </div>
+</div>
+
+<script>
+const boardEl=document.getElementById('board');
+const scoreEl=document.getElementById('score');
+const bestEl=document.getElementById('best');
+const message=document.getElementById('message');
+const finalScore=document.getElementById('finalScore');
+
+let board,score=0;
+let achieved2048=false;
+let best=Number(localStorage.getItem('2048-best')||0);
+bestEl.textContent=best;
+
+function emptyBoard(){return Array.from({length:16},()=>0)}
+
+function start(){
+  board=emptyBoard();
+  score=0;
+  message.style.display='none';
+  addTile();addTile();
+  update();
+}
+
+function addTile(){
+  const empty=board.map((v,i)=>v===0?i:-1).filter(i=>i>=0);
+  if(!empty.length)return;
+  const i=empty[Math.floor(Math.random()*empty.length)];
+  board[i]=Math.random()<0.9?2:4;
+}
+
+function showAchievement(){
+  if(achieved2048)return;
+  achieved2048=true;
+  document.querySelector('#message .modal h2').textContent='！恭喜目標達成！';
+  document.querySelector('#message .modal p').textContent='你已經成功合成 2048！遊戲會繼續進行 🎉';
+  document.getElementById('again').textContent='繼續遊戲';
+  message.style.display='flex';
+}
+
+function update(){
+  boardEl.innerHTML='';
+  board.forEach(v=>{
+    const cell=document.createElement('div');
+    cell.className='cell'+(v?' n'+v:'');
+    cell.textContent=v||'';
+    boardEl.appendChild(cell);
+  });
+  scoreEl.textContent=score;
+  if(!achieved2048 && board.includes(2048)) setTimeout(showAchievement,120);
+  if(score>best){
+    best=score;
+    localStorage.setItem('2048-best',best);
+  }
+  bestEl.textContent=best;
+}
+
+function move(dir){
+  const old=board.join(',');
+  let lines=[];
+
+  if(dir==='left'||dir==='right'){
+    for(let r=0;r<4;r++)lines.push(board.slice(r*4,r*4+4));
+  }else{
+    for(let c=0;c<4;c++)lines.push([board[c],board[c+4],board[c+8],board[c+12]]);
+  }
+
+  lines=lines.map(line=>{
+    if(dir==='right'||dir==='down')line.reverse();
+    line=line.filter(x=>x);
+
+    for(let i=0;i<line.length-1;i++){
+      if(line[i]===line[i+1]){
+        line[i]*=2;
+        score+=line[i];
+        line.splice(i+1,1);
+      }
+    }
+
+    while(line.length<4)line.push(0);
+    if(dir==='right'||dir==='down')line.reverse();
+    return line;
+  });
+
+  if(dir==='left'||dir==='right'){
+    for(let r=0;r<4;r++)
+      for(let c=0;c<4;c++)
+        board[r*4+c]=lines[r][c];
+  }else{
+    for(let c=0;c<4;c++)
+      for(let r=0;r<4;r++)
+        board[r*4+c]=lines[c][r];
+  }
+
+  if(board.join(',')!==old){
+    addTile();
+    update();
+    if(!canMove())setTimeout(endGame,180);
+  }
+}
+
+function canMove(){
+  if(board.some(v=>v===0))return true;
+  for(let r=0;r<4;r++){
+    for(let c=0;c<4;c++){
+      const i=r*4+c;
+      if(c<3&&board[i]===board[i+1])return true;
+      if(r<3&&board[i]===board[i+4])return true;
+    }
+  }
+  return false;
+}
+
+function endGame(){
+  finalScore.textContent=score;
+  message.style.display='flex';
+}
+
+document.addEventListener('keydown',e=>{
+  const keys={
+    ArrowLeft:'left',
+    ArrowRight:'right',
+    ArrowUp:'up',
+    ArrowDown:'down'
+  };
+  if(keys[e.key]){
+    e.preventDefault();
+    move(keys[e.key]);
+  }
+});
+
+document.getElementById('restart').onclick=start;
+document.getElementById('again').onclick=()=>{
+  if(achieved2048) message.style.display='none';
+  else start();
+};
+
+let sx=0,sy=0;
+
+boardEl.addEventListener('touchstart',e=>{
+  const t=e.changedTouches[0];
+  sx=t.clientX;
+  sy=t.clientY;
+},{passive:true});
+
+boardEl.addEventListener('touchend',e=>{
+  const t=e.changedTouches[0];
+  const dx=t.clientX-sx;
+  const dy=t.clientY-sy;
+
+  if(Math.max(Math.abs(dx),Math.abs(dy))<30)return;
+
+  if(Math.abs(dx)>Math.abs(dy)){
+    move(dx>0?'right':'left');
+  }else{
+    move(dy>0?'down':'up');
+  }
+},{passive:true});
+
+start();
+</script>
+</body>
+</html>
